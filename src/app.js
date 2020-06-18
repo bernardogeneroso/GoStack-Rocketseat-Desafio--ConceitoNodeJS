@@ -1,94 +1,58 @@
-const express = require('express');
-const { uuid } = require('uuidv4');
-const cors = require('cors');
+import React, { useState, useEffect } from 'react';
 
-const app = express();
+import api from './services/api';
 
-app.use(express.json());
-app.use(cors());
+import './styles.css';
 
-const repositories = [];
+function App() {
+  const [repositories, setRepositories] = useState([]);
 
-app.get('/repositories', (request, response) => {
-  return response.json(repositories);
-});
+  useEffect(() => {
+    api
+      .get('repositories')
+      .then(response => {
+        setRepositories(response.data);
+      })
+      .catch(err => {
+        console.log(err);
+      });
+  }, []);
 
-app.post('/repositories', (request, response) => {
-  const { title, url, techs } = request.body;
+  async function handleAddRepository() {
+    const response = await api.post('repositories', {
+      title: `New Repository ${Date.now()}`,
+      url: `http://www.github.com/bernardogeneroso`,
+      techs: ['React JS'],
+    });
 
-  const NEWrepositorio = {
-    id: uuid(),
-    title,
-    url,
-    techs,
-    likes: 0,
-  };
-
-  repositories.push(NEWrepositorio);
-
-  return response.json(NEWrepositorio);
-});
-
-app.put('/repositories/:id', (request, response) => {
-  const { id } = request.params;
-  const { title, url, techs } = request.body;
-
-  const repositoryIndex = repositories.findIndex(
-    repository => repository.id === id,
-  );
-
-  if (repositoryIndex < 0) {
-    return response.status(400).json({ error: 'Repository not found.' });
+    setRepositories([...repositories, response.data]);
   }
 
-  const { likes } = repositories[repositoryIndex];
-  const titleTake = repositories[repositoryIndex].title;
-  const urlTake = repositories[repositoryIndex].url;
-  const techsTake = repositories[repositoryIndex].techs;
+  async function handleRemoveRepository(id) {
+    const response = await api.delete(`repositories/${id}`);
 
-  repositories[repositoryIndex] = {
-    id,
-    title: title ? title : titleTake,
-    url: url ? url : urlTake,
-    techs: techs ? techs : techsTake,
-    likes,
-  };
-
-  return response.status(200).json({ message: 'Success' });
-});
-
-app.delete('/repositories/:id', (request, response) => {
-  const { id } = request.params;
-
-  const repositoryIndex = repositories.findIndex(
-    repository => repository.id === id,
-  );
-
-  repositories.splice(repositoryIndex, 1);
-
-  return response.status(200).json({ message: 'Success' });
-});
-
-app.post('/repositories/:id/like', (request, response) => {
-  const { id } = request.params;
-
-  const repositoryIndex = repositories.findIndex(
-    repository => repository.id === id,
-  );
-
-  if (repositoryIndex < 0) {
-    return response.status(400).json({ error: 'Repository not found.' });
+    if (response.status === 204) {
+      setRepositories(repositories.filter(repository => repository.id !== id));
+    }
   }
 
-  const repositoryTake = repositories[repositoryIndex];
-  const likesSum = repositoryTake.likes + 1;
+  return (
+    <div>
+      <ul data-testid="repository-list">
+        {repositories.map(repository => (
+          <li key={repository.id}>
+            {repository.title}
 
-  repositories[repositoryIndex] = {
-    ...repositoryTake,
-    likes: repositoryTake.likes + 1,
-  };
+            <button onClick={() => handleRemoveRepository(repository.id)}>
+              Remover
+            </button>
+          </li>
+        ))}
+      </ul>
 
-  return response.status(200).json({ message: 'Success', likes: likesSum });
-});
+      <button onClick={handleAddRepository}>Adicionar</button>
+    </div>
+  );
+}
 
-module.exports = app;
+export default App;

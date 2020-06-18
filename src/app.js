@@ -1,58 +1,94 @@
-import React, { useState, useEffect } from 'react';
+const express = require('express');
+const { uuid } = require('uuidv4');
+const cors = require('cors');
 
-import api from './services/api';
+const app = express();
 
-import './styles.css';
+app.use(express.json());
+app.use(cors());
 
-function App() {
-  const [repositories, setRepositories] = useState([]);
+const repositories = [];
 
-  useEffect(() => {
-    api
-      .get('repositories')
-      .then(response => {
-        setRepositories(response.data);
-      })
-      .catch(err => {
-        console.log(err);
-      });
-  }, []);
+app.get('/repositories', (request, response) => {
+  return response.json(repositories);
+});
 
-  async function handleAddRepository() {
-    const response = await api.post('repositories', {
-      title: `New Repository ${Date.now()}`,
-      url: `http://www.github.com/bernardogeneroso`,
-      techs: ['React JS'],
-    });
+app.post('/repositories', (request, response) => {
+  const { title, url, techs } = request.body;
 
-    setRepositories([...repositories, response.data]);
-  }
+  const NEWrepositorio = {
+    id: uuid(),
+    title,
+    url,
+    techs,
+    likes: 0,
+  };
 
-  async function handleRemoveRepository(id) {
-    const response = await api.delete(`repositories/${id}`);
+  repositories.push(NEWrepositorio);
 
-    if (response.status === 204) {
-      setRepositories(repositories.filter(repository => repository.id !== id));
-    }
-  }
+  return response.json(NEWrepositorio);
+});
 
-  return (
-    <div>
-      <ul data-testid="repository-list">
-        {repositories.map(repository => (
-          <li key={repository.id}>
-            {repository.title}
+app.put('/repositories/:id', (request, response) => {
+  const { id } = request.params;
+  const { title, url, techs } = request.body;
 
-            <button onClick={() => handleRemoveRepository(repository.id)}>
-              Remover
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <button onClick={handleAddRepository}>Adicionar</button>
-    </div>
+  const repositoryIndex = repositories.findIndex(
+    repository => repository.id === id,
   );
-}
 
-export default App;
+  if (repositoryIndex < 0) {
+    return response.status(400).json({ error: 'Repository not found.' });
+  }
+
+  const { likes } = repositories[repositoryIndex];
+  const titleTake = repositories[repositoryIndex].title;
+  const urlTake = repositories[repositoryIndex].url;
+  const techsTake = repositories[repositoryIndex].techs;
+
+  repositories[repositoryIndex] = {
+    id,
+    title: title ? title : titleTake,
+    url: url ? url : urlTake,
+    techs: techs ? techs : techsTake,
+    likes,
+  };
+
+  return response.status(200).json({ message: 'Success' });
+});
+
+app.delete('/repositories/:id', (request, response) => {
+  const { id } = request.params;
+
+  const repositoryIndex = repositories.findIndex(
+    repository => repository.id === id,
+  );
+
+  repositories.splice(repositoryIndex, 1);
+
+  return response.status(200).json({ message: 'Success' });
+});
+
+app.post('/repositories/:id/like', (request, response) => {
+  const { id } = request.params;
+
+  const repositoryIndex = repositories.findIndex(
+    repository => repository.id === id,
+  );
+
+  if (repositoryIndex < 0) {
+    return response.status(400).json({ error: 'Repository not found.' });
+  }
+
+  const repositoryTake = repositories[repositoryIndex];
+  const likesSum = repositoryTake.likes + 1;
+
+  repositories[repositoryIndex] = {
+    ...repositoryTake,
+    likes: repositoryTake.likes + 1,
+  };
+
+  return response.status(200).json(repositories[repositoryIndex]);
+});
+
+module.exports = app;
